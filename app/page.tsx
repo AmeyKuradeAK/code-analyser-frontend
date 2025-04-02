@@ -1,103 +1,146 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
+
+// ✅ Lazy load Lottie to prevent "document is not defined" error
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
+import loadingAnimation from "@/public/loading.json"; 
+
+const CodeExplainer = () => {
+  const [code, setCode] = useState("");
+  const [level, setLevel] = useState("beginner");
+  const [response, setResponse] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [typedResponse, setTypedResponse] = useState("");
+
+  // ✅ Prevents hydration errors
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const handleExplain = async () => {
+    setLoading(true);
+    setResponse("");
+    setTypedResponse("");
+
+    try {
+      const res = await fetch("http://localhost:5000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `Explain the following code to a ${level}:\n\n${code}` }),
+      });
+
+      const data = await res.json();
+      setResponse(data.reply || "No explanation found.");
+
+      // ✅ Faster typing effect
+      let index = 0;
+      const typingSpeed = Math.max(3, 500 / data.reply.length); 
+
+      const interval = setInterval(() => {
+        setTypedResponse((prev) => prev + data.reply[index]);
+        index++;
+        if (index >= data.reply.length) clearInterval(interval);
+      }, typingSpeed);
+    } catch (error) {
+      console.error("Frontend Error:", error);
+      setResponse("Error fetching explanation. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Prevents hydration mismatch
+  if (!isMounted) return null;
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="max-w-4xl mx-auto p-8 space-y-6 bg-white shadow-lg rounded-xl border border-gray-200"
+    >
+      <h1 className="text-2xl font-bold text-center bg-gradient-to-r from-blue-500 to-purple-500 text-transparent bg-clip-text">
+        AI-Powered Code Explainer
+      </h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <Textarea
+        className="w-full h-36 resize-none border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 transition"
+        placeholder="Paste your code here..."
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+      />
+
+      <Select onValueChange={setLevel} defaultValue={level}>
+        <SelectTrigger className="border-gray-300 w-full rounded-lg focus:ring-2 focus:ring-blue-400 transition">
+          <SelectValue placeholder="Select explanation level" />
+        </SelectTrigger>
+        <SelectContent className="border-gray-300">
+          <SelectItem value="beginner">Beginner</SelectItem>
+          <SelectItem value="intermediate">Intermediate</SelectItem>
+          <SelectItem value="expert">Expert</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <motion.div whileHover={{ scale: 1.05 }} transition={{ duration: 0.2 }}>
+        <Button
+          onClick={handleExplain}
+          disabled={loading}
+          className="w-full py-3 text-lg font-semibold rounded-lg transition bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          {loading ? "Explaining..." : "Explain Code"}
+        </Button>
+      </motion.div>
+
+      {loading && (
+        <div className="flex justify-center">
+          <Lottie animationData={loadingAnimation} className="w-24 h-24" />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      )}
+
+      {typedResponse && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="p-6 border rounded-lg bg-gray-50 shadow-md"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <ReactMarkdown
+            components={{
+              code({ node, inline, className, children, ...props }: React.ComponentProps<"code"> & { node?: any; inline?: boolean }) {
+                const match = /language-(\w+)/.exec(className || "");
+                return !inline && match ? (
+                  <SyntaxHighlighter
+                    style={oneDark}
+                    language={match[1]}
+                    PreTag="div"
+                    className="rounded-lg overflow-hidden"
+                  >
+                    {String(children).replace(/\n$/, "")}
+                  </SyntaxHighlighter>
+                ) : (
+                  <code className="bg-gray-200 text-red-500 px-2 py-1 rounded-md" {...props}>
+                    {children}
+                  </code>
+                );
+              },
+            }}
+          >
+            {typedResponse}
+          </ReactMarkdown>
+        </motion.div>
+      )}
+    </motion.div>
   );
-}
+};
+
+export default CodeExplainer;
