@@ -17,7 +17,6 @@ import loadingAnimation from "@/public/loading.json";
 const CodeExplainer = () => {
   const [code, setCode] = useState("");
   const [level, setLevel] = useState("beginner");
-  const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [typedResponse, setTypedResponse] = useState("");
@@ -29,7 +28,6 @@ const CodeExplainer = () => {
 
   const handleExplain = async () => {
     setLoading(true);
-    setResponse("");
     setTypedResponse("");
 
     try {
@@ -40,7 +38,6 @@ const CodeExplainer = () => {
       });
 
       const data = await res.json();
-      setResponse(data.reply || "No explanation found.");
 
       // ✅ Faster typing effect
       let index = 0;
@@ -53,7 +50,6 @@ const CodeExplainer = () => {
       }, typingSpeed);
     } catch (error) {
       console.error("Frontend Error:", error);
-      setResponse("Error fetching explanation. Try again.");
     } finally {
       setLoading(false);
     }
@@ -116,7 +112,7 @@ const CodeExplainer = () => {
         >
           <ReactMarkdown
             components={{
-              code({ node, inline, className, children, ...props }: React.ComponentProps<"code"> & { node?: any; inline?: boolean }) {
+              code({ inline, className, children, ...props }: React.ComponentProps<"code"> & { node?: unknown; inline?: boolean }) {
                 const match = /language-(\w+)/.exec(className || "");
                 return !inline && match ? (
                   <SyntaxHighlighter
